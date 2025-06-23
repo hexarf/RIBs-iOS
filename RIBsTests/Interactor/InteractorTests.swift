@@ -7,6 +7,7 @@
 
 @testable import RIBs
 import XCTest
+import RxSwift
 
 final class InteractorTests: XCTestCase {
     
@@ -20,7 +21,7 @@ final class InteractorTests: XCTestCase {
     
     func test_interactorIsInactiveByDefault() {
         XCTAssertFalse(interactor.isActive)
-        interactor.isActiveStream.subscribe { isActive in
+        let _ = interactor.isActiveStream.subscribe { isActive in
             XCTAssertFalse(isActive)
         }
     }
@@ -31,7 +32,7 @@ final class InteractorTests: XCTestCase {
         interactor.activate()
         // then
         XCTAssertTrue(interactor.isActive)
-        interactor.isActiveStream.subscribe { isActive in
+        let _ = interactor.isActiveStream.subscribe { isActive in
             XCTAssertTrue(isActive)
         }
     }
@@ -43,7 +44,7 @@ final class InteractorTests: XCTestCase {
         interactor.deactivate()
         // then
         XCTAssertFalse(interactor.isActive)
-        interactor.isActiveStream.subscribe { isActive in
+        let _ = interactor.isActiveStream.subscribe { isActive in
             XCTAssertFalse(isActive)
         }
     }
@@ -86,24 +87,86 @@ final class InteractorTests: XCTestCase {
         XCTAssertEqual(interactor.willResignActiveCallCount, 1)
     }
     
-    // MARK: - BEGIN Observables Attached to Interactor
     func test_isActiveStream_completedOnInteractorDeinit() {
         // given
         var isActiveStreamCompleted = false
-        interactor.isActiveStream.subscribe { _ in
-            
-        } onError: { _ in
-            
-        } onCompleted: {
+        interactor.activate()
+        let _ = interactor.isActiveStream.subscribe { _ in } onCompleted: {
             isActiveStreamCompleted = true
-        } onDisposed: {
-            
         }
+        
         // when
         interactor = nil
         // then
         XCTAssertTrue(isActiveStreamCompleted)
         
     }
-    // MARK: Observables Attached to Interactor END -
+    
+    // MARK: - BEGIN Observables Attached/Detached to/from Interactor
+    func test_observableAttachedToInactiveInteactorIsDisposedImmediately() {
+        // given
+        var onDisposeCalled = false
+        let subjectEmiitingValues: PublishSubject<Int> = .init()
+        let observable = subjectEmiitingValues.asObservable().do { _ in } onDispose: {
+            onDisposeCalled = true
+        }
+        // when
+        observable.subscribe().disposeOnDeactivate(interactor: interactor)
+        // then
+        XCTAssertTrue(onDisposeCalled)
+    }
+    
+    func test_observableIsDisposedOnInteractorDeactivation() {
+        // given
+        var onDisposeCalled = false
+        let subjectEmiitingValues: PublishSubject<Int> = .init()
+        let observable = subjectEmiitingValues.asObservable().do { _ in } onDispose: {
+            onDisposeCalled = true
+        }
+        interactor.activate()
+        observable.subscribe().disposeOnDeactivate(interactor: interactor)
+        // when
+        interactor.deactivate()
+        // then
+        XCTAssertTrue(onDisposeCalled)
+    }
+    
+    func test_observableIsDisposedOnInteractorDeinit() {
+        // given
+        var onDisposeCalled = false
+        let subjectEmiitingValues: PublishSubject<Int> = .init()
+        let observable = subjectEmiitingValues.asObservable().do { _ in } onDispose: {
+            onDisposeCalled = true
+        }
+        interactor.activate()
+        observable.subscribe().disposeOnDeactivate(interactor: interactor)
+        XCTAssertFalse(onDisposeCalled)
+        // when
+        interactor = nil
+        // then
+        XCTAssertTrue(onDisposeCalled)
+    }
+    // MARK: Observables Attached/Detached to/from Interactor END -
+    
+    // MARK: - BEGIN Observables Confined to Interactor
+    func test_observableConfinedToInteractorOnlyEmitsValueWhenInteractorIsActive() {
+        // given
+        var emittedValue: Int?
+        let subjectEmiitingValues: PublishSubject<Int> = .init()
+        let confinedObservable = subjectEmiitingValues.asObservable().confineTo(interactor)
+        let _ = confinedObservable.confineTo(interactor)
+        let _ = confinedObservable.subscribe { newValue in
+            emittedValue = newValue
+        }
+
+        subjectEmiitingValues.onNext(1)
+        XCTAssertNil(emittedValue)
+        // when
+        interactor.activate()
+        subjectEmiitingValues.onNext(2)
+        // then
+        XCTAssertNotNil(emittedValue)
+        XCTAssertEqual(emittedValue, 2)
+    }
+    // MARK: Observables Confined to Interactor -
 }
