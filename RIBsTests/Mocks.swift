@@ -44,27 +44,28 @@ class ViewControllableMock: ViewControllable {
     let uiviewController = UIViewController(nibName: nil, bundle: nil)
 }
 
-class InteractorMock: Interactable {
-    var isActive: Bool {
-        return active.value
+class InteractorMock: Interactor {
+    var didBecomeActiveHandler: (() -> ())?
+    var didBecomeActiveCallCount: Int = 0
+    var willResignActiveHandler: (() -> ())?
+    var willResignActiveCallCount: Int = 0
+    
+    override func didBecomeActive() {
+        didBecomeActiveCallCount += 1
+        super.didBecomeActive()
+        
+        if let didBecomeActiveHandler = didBecomeActiveHandler {
+            didBecomeActiveHandler()
+        }
     }
-
-    var isActiveStream: Observable<Bool> {
-        return active.asObservable()
-    }
-
-    private let active = BehaviorRelay<Bool>(value: false)
-
-    init() {}
-
-    // MARK: - Lifecycle
-
-    func activate() {
-        active.accept(true)
-    }
-
-    func deactivate() {
-        active.accept(false)
+    
+    override func willResignActive() {
+        willResignActiveCallCount += 1
+        super.willResignActive()
+        
+        if let willResignActiveHandler = willResignActiveHandler {
+            willResignActiveHandler()
+        }
     }
 }
 
