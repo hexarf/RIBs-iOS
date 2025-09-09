@@ -1,10 +1,10 @@
-// swift-tools-version:5.1
+// swift-tools-version:5.5
 import PackageDescription
 
 let package = Package(
     name: "RIBs",
     platforms: [
-        .iOS(.v9),
+        .iOS(.v13),
     ],
     products: [
         .library(name: "RIBs", targets: ["RIBs"]),
@@ -16,7 +16,10 @@ let package = Package(
     targets: [
         .target(
             name: "RIBs",
-            dependencies: ["RxSwift", "RxRelay"],
+            dependencies: [
+                .product(name: "RxSwift", package: "RxSwift"),
+                .product(name: "RxRelay", package: "RxSwift")
+            ],
             path: "RIBs"
         ),
         .testTarget(
